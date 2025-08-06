@@ -1,3 +1,4 @@
 Flask
 flask_cors
-solana
+solana==0.25.0
+solders==0.2.0
